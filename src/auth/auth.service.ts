@@ -1,0 +1,59 @@
+import { Injectable, ConflictException, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { PrismaService } from 'prisma/prisma.service';
+import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
+import * as bcrypt from 'bcrypt';
+
+const SALT_ROUNDS = 12;
+
+@Injectable()
+export class AuthService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwtService: JwtService,
+  ) {}
+
+  async register(dto: RegisterDto): Promise<{ accessToken: string }> {
+    const exists = await this.prisma.user.findUnique({
+      where: { nickname: dto.nickname },
+    });
+
+    if (exists) {
+      throw new ConflictException('이미 사용 중인 닉네임입니다.');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.password, SALT_ROUNDS);
+
+    const user = await this.prisma.user.create({
+      data: {
+        nickname: dto.nickname,
+        password: hashedPassword,
+      },
+    });
+
+    return { accessToken: this.issueToken(user.id, user.nickname) };
+  }
+
+  async login(dto: LoginDto): Promise<{ accessToken: string }> {
+    const user = await this.prisma.user.findUnique({
+      where: { nickname: dto.nickname },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('닉네임 또는 비밀번호가 올바르지 않습니다.');
+    }
+
+    const isPasswordValid = await bcrypt.compare(dto.password, user.password);
+
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('닉네임 또는 비밀번호가 올바르지 않습니다.');
+    }
+
+    return { accessToken: this.issueToken(user.id, user.nickname) };
+  }
+
+  private issueToken(userId: string, nickname: string): string {
+    return this.jwtService.sign({ sub: userId, nickname });
+  }
+}
