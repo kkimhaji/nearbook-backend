@@ -1,15 +1,85 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+enum BleVisibility {
+  public
+  friends_only
+  hidden
+}
+
+enum FriendshipStatus {
+  pending
+  accepted
+}
+
+enum GuestbookRequestStatus {
+  pending
+  writing
+  completed
+  rejected
+}
+
+model User {
+  id               String        @id @default(uuid())
+  nickname         String        @unique
+  password         String
+  profileImageUrl  String?       @map("profile_image_url")
+  bleVisibility    BleVisibility @default(friends_only) @map("ble_visibility")
+  createdAt        DateTime      @default(now()) @map("created_at")
+
+  sentFriendships     Friendship[]        @relation("Requester")
+  receivedFriendships Friendship[]        @relation("Receiver")
+  ownedRequests       GuestbookRequest[]  @relation("Owner")
+  writingRequests     GuestbookRequest[]  @relation("Writer")
+  ownedEntries        GuestbookEntry[]    @relation("EntryOwner")
+  writtenEntries      GuestbookEntry[]    @relation("EntryWriter")
+
+  @@map("users")
+}
+
+model Friendship {
+  id          String           @id @default(uuid())
+  requesterId String           @map("requester_id")
+  receiverId  String           @map("receiver_id")
+  status      FriendshipStatus @default(pending)
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  requester User @relation("Requester", fields: [requesterId], references: [id])
+  receiver  User @relation("Receiver", fields: [receiverId], references: [id])
+
+  @@unique([requesterId, receiverId])
+  @@map("friendships")
+}
+
+model GuestbookRequest {
+  id        String                 @id @default(uuid())
+  ownerId   String                 @map("owner_id")
+  writerId  String                 @map("writer_id")
+  status    GuestbookRequestStatus @default(pending)
+  expiresAt DateTime               @map("expires_at")
+  createdAt DateTime               @default(now()) @map("created_at")
+
+  owner  User @relation("Owner", fields: [ownerId], references: [id])
+  writer User @relation("Writer", fields: [writerId], references: [id])
+
+  @@map("guestbook_requests")
+}
+
+model GuestbookEntry {
+  id        String   @id @default(uuid())
+  ownerId   String   @map("owner_id")
+  writerId  String   @map("writer_id")
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  owner  User @relation("EntryOwner", fields: [ownerId], references: [id])
+  writer User @relation("EntryWriter", fields: [writerId], references: [id])
+
+  @@map("guestbook_entries")
 }
