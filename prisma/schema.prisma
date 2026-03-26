@@ -28,6 +28,7 @@ enum GuestbookRequestStatus {
 model User {
   id               String        @id @default(uuid())
   nickname         String        @unique
+  email           String        @unique 
   password         String
   profileImageUrl  String?       @map("profile_image_url")
   bleVisibility    BleVisibility @default(friends_only) @map("ble_visibility")

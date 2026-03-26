@@ -15,23 +15,32 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto): Promise<{ accessToken: string }> {
-    const exists = await this.prisma.user.findUnique({
-      where: { nickname: dto.nickname },
+    const exists = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { nickname: dto.nickname },
+          { email: dto.email },
+        ],
+      },
     });
-
+  
     if (exists) {
-      throw new ConflictException('이미 사용 중인 닉네임입니다.');
+      if (exists.nickname === dto.nickname) {
+        throw new ConflictException('이미 사용 중인 닉네임입니다.');
+      }
+      throw new ConflictException('이미 사용 중인 이메일입니다.');
     }
-
+  
     const hashedPassword = await bcrypt.hash(dto.password, SALT_ROUNDS);
-
+  
     const user = await this.prisma.user.create({
       data: {
         nickname: dto.nickname,
+        email: dto.email,
         password: hashedPassword,
       },
     });
-
+  
     return { accessToken: this.issueToken(user.id, user.nickname) };
   }
 
