@@ -18,51 +18,52 @@ export class AuthService {
     const exists = await this.prisma.user.findFirst({
       where: {
         OR: [
-          { nickname: dto.nickname },
+          { username: dto.username },
           { email: dto.email },
         ],
       },
     });
-  
+
     if (exists) {
-      if (exists.nickname === dto.nickname) {
-        throw new ConflictException('이미 사용 중인 닉네임입니다.');
+      if (exists.username === dto.username) {
+        throw new ConflictException('이미 사용 중인 아이디입니다.');
       }
       throw new ConflictException('이미 사용 중인 이메일입니다.');
     }
-  
+
     const hashedPassword = await bcrypt.hash(dto.password, SALT_ROUNDS);
-  
+
     const user = await this.prisma.user.create({
       data: {
+        username: dto.username,
         nickname: dto.nickname,
         email: dto.email,
         password: hashedPassword,
       },
     });
-  
-    return { accessToken: this.issueToken(user.id, user.nickname) };
+
+    return { accessToken: this.issueToken(user.id, user.username) };
   }
 
   async login(dto: LoginDto): Promise<{ accessToken: string }> {
     const user = await this.prisma.user.findUnique({
-      where: { nickname: dto.nickname },
+      where: { username: dto.username },
     });
 
     if (!user) {
-      throw new UnauthorizedException('닉네임 또는 비밀번호가 올바르지 않습니다.');
+      throw new UnauthorizedException('아이디 또는 비밀번호가 올바르지 않습니다.');
     }
 
     const isPasswordValid = await bcrypt.compare(dto.password, user.password);
 
     if (!isPasswordValid) {
-      throw new UnauthorizedException('닉네임 또는 비밀번호가 올바르지 않습니다.');
+      throw new UnauthorizedException('아이디 또는 비밀번호가 올바르지 않습니다.');
     }
 
-    return { accessToken: this.issueToken(user.id, user.nickname) };
+    return { accessToken: this.issueToken(user.id, user.username) };
   }
 
-  private issueToken(userId: string, nickname: string): string {
-    return this.jwtService.sign({ sub: userId, nickname });
+  private issueToken(userId: string, username: string): string {
+    return this.jwtService.sign({ sub: userId, username });
   }
 }
