@@ -46,7 +46,7 @@ model User {
 }
 
 model Friendship {
-  id          String           @id @default(uuid())
+  id          Int              @id @default(autoincrement()) 
   requesterId String           @map("requester_id")
   receiverId  String           @map("receiver_id")
   status      FriendshipStatus @default(pending)
@@ -60,7 +60,7 @@ model Friendship {
 }
 
 model GuestbookRequest {
-  id        String                 @id @default(uuid())
+  id          Int              @id @default(autoincrement())
   ownerId   String                 @map("owner_id")
   writerId  String                 @map("writer_id")
   status    GuestbookRequestStatus @default(pending)
@@ -74,7 +74,7 @@ model GuestbookRequest {
 }
 
 model GuestbookEntry {
-  id        String   @id @default(uuid())
+  id          Int              @id @default(autoincrement())
   ownerId   String   @map("owner_id")
   writerId  String   @map("writer_id")
   content   String

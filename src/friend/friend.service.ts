@@ -57,7 +57,7 @@ import {
       return friendship;
     }
   
-    async acceptRequest(userId: string, friendshipId: string) {
+    async acceptRequest(userId: string, friendshipId: number) {
       const friendship = await this.prisma.friendship.findUnique({
         where: { id: friendshipId },
       });
@@ -85,7 +85,7 @@ import {
       });
     }
   
-    async rejectRequest(userId: string, friendshipId: string) {
+    async rejectRequest(userId: string, friendshipId: number) {
       const friendship = await this.prisma.friendship.findUnique({
         where: { id: friendshipId },
       });

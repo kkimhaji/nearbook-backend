@@ -11,7 +11,8 @@ import {
   import { SendFriendRequestDto } from './dto/send-friend-request.dto';
   import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
   import { CurrentUser } from '../common/decorators/current-user.decorator';
-  
+  import { ParseIntPipe } from '@nestjs/common';
+
   @UseGuards(JwtAuthGuard)
   @Controller('friends')
   export class FriendController {
@@ -25,18 +26,19 @@ import {
       return this.friendService.sendRequest(user.id, dto);
     }
   
+
     @Patch('request/:id/accept')
     acceptRequest(
       @CurrentUser() user: { id: string },
-      @Param('id') friendshipId: string,
+      @Param('id', ParseIntPipe) friendshipId: number,
     ) {
       return this.friendService.acceptRequest(user.id, friendshipId);
     }
-  
+
     @Patch('request/:id/reject')
     rejectRequest(
       @CurrentUser() user: { id: string },
-      @Param('id') friendshipId: string,
+      @Param('id', ParseIntPipe) friendshipId: number,
     ) {
       return this.friendService.rejectRequest(user.id, friendshipId);
     }
