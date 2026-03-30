@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { UserService } from './user.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -7,7 +7,7 @@ import { IsString } from 'class-validator';
 @UseGuards(JwtAuthGuard)
 @Controller('users')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(private readonly userService: UserService) { }
 
   @Get('search')
   searchUser(
@@ -15,5 +15,10 @@ export class UserController {
     @CurrentUser() user: { id: string },
   ) {
     return this.userService.searchByUsername(username, user.id);
+  }
+
+  @Post('ble-token')
+  issueBleToken(@CurrentUser() user: { id: string }) {
+    return this.userService.issueBleToken(user.id);
   }
 }

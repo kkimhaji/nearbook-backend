@@ -5,6 +5,7 @@ import { AuthModule } from './auth/auth.module';
 import { FriendModule } from './friend/friend.module';
 import { UserModule } from './user/user.module';
 import { GatewayModule } from './gateway/gateway.module';
+import { GuestbookModule } from './guestbook/guestbook.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { GatewayModule } from './gateway/gateway.module';
     FriendModule,
     UserModule,
     GatewayModule,
+    GuestbookModule,
   ],
 })
 export class AppModule {}

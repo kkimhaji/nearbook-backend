@@ -1,9 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class UserService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async searchByUsername(username: string, requesterId: string) {
     const user = await this.prisma.user.findUnique({
@@ -41,5 +42,19 @@ export class UserService {
       friendshipId: friendship?.id ?? null,
       isRequester: friendship?.requesterId === requesterId,
     };
+  }
+
+  async issueBleToken(userId: string): Promise<{ token: string; expiresAt: Date }> {
+    const token = crypto.randomBytes(16).toString('hex');
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10분
+
+    // 기존 토큰 삭제 후 새로 발급
+    await this.prisma.bleToken.deleteMany({ where: { userId } });
+
+    const bleToken = await this.prisma.bleToken.create({
+      data: { userId, token, expiresAt },
+    });
+
+    return { token: bleToken.token, expiresAt: bleToken.expiresAt };
   }
 }

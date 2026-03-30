@@ -41,6 +41,7 @@ model User {
   writingRequests     GuestbookRequest[]  @relation("Writer")
   ownedEntries        GuestbookEntry[]    @relation("EntryOwner")
   writtenEntries      GuestbookEntry[]    @relation("EntryWriter")
+  bleTokens           BleToken[]
 
   @@map("users")
 }
@@ -84,4 +85,16 @@ model GuestbookEntry {
   writer User @relation("EntryWriter", fields: [writerId], references: [id])
 
   @@map("guestbook_entries")
+}
+
+model BleToken {
+  id        Int      @id @default(autoincrement())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("ble_tokens")
 }
