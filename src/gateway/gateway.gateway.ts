@@ -169,6 +169,7 @@ export class NearBookGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.server.to(socketId).emit(GatewayEvents.GUESTBOOK_COMPLETED, payload);
   }
 
+  // src/gateway/gateway.gateway.ts - resolveDeviceTokens 교체
   private async resolveDeviceTokens(
     tokens: string[],
     requesterId: string,
@@ -177,6 +178,7 @@ export class NearBookGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     const now = new Date();
 
+    // 1. 유효한 BLE 토큰 일괄 조회
     const bleTokens = await this.prisma.bleToken.findMany({
       where: {
         token: { in: tokens },
@@ -195,41 +197,51 @@ export class NearBookGateway implements OnGatewayConnection, OnGatewayDisconnect
       },
     });
 
-    const requester = await this.prisma.user.findUnique({
-      where: { id: requesterId },
-      select: { id: true },
-    });
+    // 자기 자신 및 hidden 제외
+    const candidates = bleTokens
+      .map((t) => t.user)
+      .filter((u) => u.id !== requesterId && u.bleVisibility !== 'hidden');
 
-    const results: object[] = [];
+    if (candidates.length === 0) return [];
 
-    for (const bleToken of bleTokens) {
-      const { user } = bleToken;
+    // 2. friends_only 유저 ID 추출
+    const friendsOnlyIds = candidates
+      .filter((u) => u.bleVisibility === 'friends_only')
+      .map((u) => u.id);
 
-      if (user.id === requesterId) continue;
-
-      if (user.bleVisibility === 'hidden') continue;
-
-      if (user.bleVisibility === 'friends_only') {
-        const friendship = await this.prisma.friendship.findFirst({
+    // 3. 친구 관계 일괄 조회 (N+1 → 1회)
+    const friendships =
+      friendsOnlyIds.length > 0
+        ? await this.prisma.friendship.findMany({
           where: {
+            status: 'accepted',
             OR: [
-              { requesterId, receiverId: user.id, status: 'accepted' },
-              { requesterId: user.id, receiverId: requesterId, status: 'accepted' },
+              { requesterId, receiverId: { in: friendsOnlyIds } },
+              { requesterId: { in: friendsOnlyIds }, receiverId: requesterId },
             ],
           },
-        });
+          select: { requesterId: true, receiverId: true },
+        })
+        : [];
 
-        if (!friendship) continue;
-      }
+    const friendIds = new Set(
+      friendships.map((f) =>
+        f.requesterId === requesterId ? f.receiverId : f.requesterId,
+      ),
+    );
 
-      results.push({
-        id: user.id,
-        username: user.username,
-        nickname: user.nickname,
-        profileImageUrl: user.profileImageUrl,
-      });
-    }
-
-    return results;
+    // 4. visibility 필터링
+    return candidates
+      .filter((u) => {
+        if (u.bleVisibility === 'public') return true;
+        if (u.bleVisibility === 'friends_only') return friendIds.has(u.id);
+        return false;
+      })
+      .map(({ id, username, nickname, profileImageUrl }) => ({
+        id,
+        username,
+        nickname,
+        profileImageUrl,
+      }));
   }
 }
