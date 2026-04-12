@@ -13,6 +13,7 @@ import { PrismaService } from 'prisma/prisma.service';
 import { GatewayService } from './gateway.service';
 import { GatewayEvents } from './gateway.events';
 import { ConfigService } from '@nestjs/config';
+import { BleTokenService } from 'src/user/ble-token.service';
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -33,6 +34,7 @@ export class NearBookGateway implements OnGatewayConnection, OnGatewayDisconnect
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    private readonly bleTokenService: BleTokenService,
   ) { }
 
   // ─── 연결 / 해제 ───────────────────────────────────────────
@@ -80,8 +82,6 @@ export class NearBookGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.gatewayService.remove(client.id);
   }
 
-  // ─── 타이핑 인디케이터 ─────────────────────────────────────
-
   @SubscribeMessage(GatewayEvents.TYPING_START)
   handleTypingStart(
     @ConnectedSocket() client: AuthenticatedSocket,
@@ -118,7 +118,6 @@ export class NearBookGateway implements OnGatewayConnection, OnGatewayDisconnect
     });
   }
 
-  // ─── BLE 감지 결과 ─────────────────────────────────────────
 
   @SubscribeMessage(GatewayEvents.BLE_DETECTED)
   async handleBleDetected(
@@ -137,7 +136,6 @@ export class NearBookGateway implements OnGatewayConnection, OnGatewayDisconnect
     client.emit(GatewayEvents.BLE_DETECTED_RESULT, { detectedUsers });
   }
 
-  // ─── 외부에서 호출하는 emit 메서드들 ──────────────────────
 
   emitFriendRequestReceived(receiverId: string, payload: object): void {
     const socketId = this.gatewayService.getSocketId(receiverId);
@@ -169,68 +167,65 @@ export class NearBookGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.server.to(socketId).emit(GatewayEvents.GUESTBOOK_COMPLETED, payload);
   }
 
-  // src/gateway/gateway.gateway.ts - resolveDeviceTokens 교체
   private async resolveDeviceTokens(
     tokens: string[],
     requesterId: string,
   ): Promise<object[]> {
     if (tokens.length === 0) return [];
-
-    const now = new Date();
-
-    // 1. 유효한 BLE 토큰 일괄 조회
-    const bleTokens = await this.prisma.bleToken.findMany({
-      where: {
-        token: { in: tokens },
-        expiresAt: { gt: now },
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            nickname: true,
-            profileImageUrl: true,
-            bleVisibility: true,
-          },
-        },
+  
+    // 1. Redis에서 token → userId 일괄 변환
+    const tokenUserMap = await this.bleTokenService.resolveTokens(tokens);
+  
+    if (tokenUserMap.size === 0) return [];
+  
+    const userIds = Array.from(tokenUserMap.values())
+      .filter((id) => id !== requesterId);
+  
+    if (userIds.length === 0) return [];
+  
+    // 2. 유저 정보 일괄 조회
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: {
+        id: true,
+        username: true,
+        nickname: true,
+        profileImageUrl: true,
+        bleVisibility: true,
       },
     });
-
-    // 자기 자신 및 hidden 제외
-    const candidates = bleTokens
-      .map((t) => t.user)
-      .filter((u) => u.id !== requesterId && u.bleVisibility !== 'hidden');
-
+  
+    // 3. hidden 제외
+    const candidates = users.filter((u) => u.bleVisibility !== 'hidden');
+  
     if (candidates.length === 0) return [];
-
-    // 2. friends_only 유저 ID 추출
+  
+    // 4. friends_only 친구 관계 일괄 조회
     const friendsOnlyIds = candidates
       .filter((u) => u.bleVisibility === 'friends_only')
       .map((u) => u.id);
-
-    // 3. 친구 관계 일괄 조회 (N+1 → 1회)
+  
     const friendships =
       friendsOnlyIds.length > 0
         ? await this.prisma.friendship.findMany({
-          where: {
-            status: 'accepted',
-            OR: [
-              { requesterId, receiverId: { in: friendsOnlyIds } },
-              { requesterId: { in: friendsOnlyIds }, receiverId: requesterId },
-            ],
-          },
-          select: { requesterId: true, receiverId: true },
-        })
+            where: {
+              status: 'accepted',
+              OR: [
+                { requesterId, receiverId: { in: friendsOnlyIds } },
+                { requesterId: { in: friendsOnlyIds }, receiverId: requesterId },
+              ],
+            },
+            select: { requesterId: true, receiverId: true },
+          })
         : [];
-
+  
     const friendIds = new Set(
       friendships.map((f) =>
         f.requesterId === requesterId ? f.receiverId : f.requesterId,
       ),
     );
-
-    // 4. visibility 필터링
+  
+    // 5. visibility 필터링
     return candidates
       .filter((u) => {
         if (u.bleVisibility === 'public') return true;
