@@ -1,14 +1,14 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { AppModule } from './app.module';
-import { createClient } from 'redis';
-import { createAdapter } from '@socket.io/redis-adapter';
-import { IoAdapter } from '@nestjs/platform-socket.io';
 import { ConfigService } from '@nestjs/config';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { AppModule } from './app.module';
+import { RedisIoAdapter } from './redis/redis-io.adapter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.listen(3000, '0.0.0.0');
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -21,23 +21,10 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   const configService = app.get(ConfigService);
-  const redisUrl = configService.getOrThrow<string>('REDIS_URL');
+  const redisIoAdapter = new RedisIoAdapter(app);
+  await redisIoAdapter.connectToRedis(configService);
+  app.useWebSocketAdapter(redisIoAdapter);
 
-  // Redis Adapter 설정
-  const pubClient = createClient({ url: redisUrl });
-  const subClient = pubClient.duplicate();
-
-  await Promise.all([pubClient.connect(), subClient.connect()]);
-
-  const ioAdapter = new IoAdapter(app);
-  app.useWebSocketAdapter(ioAdapter);
-
-  const httpServer = app.getHttpServer();
-  const { Server } = await import('socket.io');
-  const io = new Server(httpServer);
-  io.adapter(createAdapter(pubClient, subClient));
-
-  // Swagger 설정
   const config = new DocumentBuilder()
     .setTitle('NearBook API')
     .setDescription('NearBook 방명록 앱 API 문서')
@@ -47,8 +34,5 @@ async function bootstrap() {
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
-
-  await app.listen(3000);
 }
-
 bootstrap();
