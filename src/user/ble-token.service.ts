@@ -13,23 +13,21 @@ export class BleTokenService {
   constructor(
     @Inject(REDIS_CLIENT)
     private readonly redis: RedisClient,
-  ) {}
+  ) { }
 
   async issueToken(userId: string): Promise<{ token: string; expiresAt: Date }> {
-    // 기존 토큰 삭제
     await this.revokeToken(userId);
 
-    const token = crypto.randomBytes(16).toString('hex');
+    // 16bytes → 8bytes (hex 32자 → 16자)
+    const token = crypto.randomBytes(4).toString('hex');
     const expiresAt = new Date(Date.now() + BLE_TOKEN_TTL_SECONDS * 1000);
 
-    // Redis에 저장 (TTL 자동 만료)
     await this.redis.set(
       `${BLE_TOKEN_PREFIX}${token}`,
       userId,
       { EX: BLE_TOKEN_TTL_SECONDS },
     );
 
-    // userId → token 역방향 인덱스 (기존 토큰 삭제용)
     await this.redis.set(
       `ble:user:${userId}`,
       token,
