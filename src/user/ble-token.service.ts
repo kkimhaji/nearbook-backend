@@ -16,23 +16,36 @@ export class BleTokenService {
   ) { }
 
   async issueToken(userId: string): Promise<{ token: string; expiresAt: Date }> {
+    console.log(`[BleToken] 토큰 발급 시작 - userId: ${userId}`);
+
     await this.revokeToken(userId);
 
-    // 16bytes → 8bytes (hex 32자 → 16자)
     const token = crypto.randomBytes(4).toString('hex');
     const expiresAt = new Date(Date.now() + BLE_TOKEN_TTL_SECONDS * 1000);
 
-    await this.redis.set(
-      `${BLE_TOKEN_PREFIX}${token}`,
-      userId,
-      { EX: BLE_TOKEN_TTL_SECONDS },
-    );
+    console.log(`[BleToken] 생성된 토큰: ${token}`);
 
-    await this.redis.set(
-      `ble:user:${userId}`,
-      token,
-      { EX: BLE_TOKEN_TTL_SECONDS },
-    );
+    try {
+      await this.redis.set(
+        `${BLE_TOKEN_PREFIX}${token}`,
+        userId,
+        { EX: BLE_TOKEN_TTL_SECONDS },
+      );
+      console.log(`[BleToken] Redis 저장 완료: ble:token:${token} → ${userId}`);
+    } catch (e) {
+      console.error(`[BleToken] Redis 저장 실패 ❌:`, e);
+    }
+
+    try {
+      await this.redis.set(
+        `ble:user:${userId}`,
+        token,
+        { EX: BLE_TOKEN_TTL_SECONDS },
+      );
+      console.log(`[BleToken] Redis 역방향 인덱스 저장 완료: ble:user:${userId} → ${token}`);
+    } catch (e) {
+      console.error(`[BleToken] Redis 역방향 인덱스 저장 실패 ❌:`, e);
+    }
 
     return { token, expiresAt };
   }
