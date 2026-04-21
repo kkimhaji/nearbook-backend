@@ -37,7 +37,6 @@ export class NearBookGateway implements OnGatewayConnection, OnGatewayDisconnect
     private readonly bleTokenService: BleTokenService,
   ) { }
 
-  // ─── 연결 / 해제 ───────────────────────────────────────────
 
   async handleConnection(client: AuthenticatedSocket): Promise<void> {
     const token = client.handshake.auth?.token as string | undefined;
@@ -119,23 +118,24 @@ export class NearBookGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
 
-  @SubscribeMessage(GatewayEvents.BLE_DETECTED)
-  async handleBleDetected(
-    @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { deviceTokens: string[] },
-  ): Promise<void> {
-    if (!client.userId) return;
+@SubscribeMessage(GatewayEvents.BLE_DETECTED)
+async handleBleDetected(
+  @ConnectedSocket() client: AuthenticatedSocket,
+  @MessageBody() data: { deviceTokens: string[] },
+): Promise<void> {
+  if (!client.userId) return;
 
-    // device_token → user 변환 (4단계에서 BleToken 모델 추가 후 구현)
-    // 현재는 기본 구조만 작성
-    const detectedUsers = await this.resolveDeviceTokens(
-      data.deviceTokens,
-      client.userId,
-    );
+  console.log(`[BLE] ${client.username} 토큰 수신:`, data.deviceTokens);
 
-    client.emit(GatewayEvents.BLE_DETECTED_RESULT, { detectedUsers });
-  }
+  const detectedUsers = await this.resolveDeviceTokens(
+    data.deviceTokens,
+    client.userId,
+  );
 
+  console.log(`[BLE] ${client.username} 감지 결과:`, detectedUsers);
+
+  client.emit(GatewayEvents.BLE_DETECTED_RESULT, { detectedUsers });
+}
 
   emitFriendRequestReceived(receiverId: string, payload: object): void {
     const socketId = this.gatewayService.getSocketId(receiverId);
