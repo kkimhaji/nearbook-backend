@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -13,6 +11,11 @@ services:
       - '5433:5432'
     volumes:
       - nearbook_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
@@ -22,6 +25,30 @@ services:
       - '6380:6379'
     volumes:
       - nearbook_redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  nearbook_server:
+      build:
+        context: .
+        dockerfile: DockerFile
+      container_name: nearbook_server
+      restart: unless-stopped
+      ports:
+        - '3000:3000'
+      environment:
+        DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+        REDIS_URL: redis://redis:6379
+        JWT_SECRET: ${JWT_SECRET}
+        JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+      depends_on:
+        postgres:
+          condition: service_healthy
+        redis:
+          condition: service_healthy
 
 volumes:
   nearbook_postgres_data:
