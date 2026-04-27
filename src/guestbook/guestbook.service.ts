@@ -299,6 +299,7 @@ export class GuestbookService {
         content: entry.content,
         createdAt: entry.createdAt,
         writer: entry.writer,
+        owner: entry.owner,
       });
     }
 
