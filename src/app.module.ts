@@ -7,11 +7,13 @@ import { UserModule } from './user/user.module';
 import { GatewayModule } from './gateway/gateway.module';
 import { GuestbookModule } from './guestbook/guestbook.module';
 import { RedisModule } from './redis/redis.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    MailModule,
     AuthModule,
     FriendModule,
     UserModule,
