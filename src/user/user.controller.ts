@@ -1,4 +1,3 @@
-// src/user/user.controller.ts
 import {
   Controller,
   Get,
@@ -8,9 +7,13 @@ import {
   Query,
   Body,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { UserService } from './user.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -21,7 +24,7 @@ import { UpdateBleVisibilityDto } from './dto/update-ble-visibility.dto';
 @UseGuards(JwtAuthGuard)
 @Controller('users')
 export class UserController {
-  constructor(private readonly userService: UserService) { }
+  constructor(private readonly userService: UserService) {}
 
   @Get('me')
   getMyProfile(@CurrentUser() user: { id: string }) {
@@ -64,6 +67,22 @@ export class UserController {
     @Body() dto: UpdateBleVisibilityDto,
   ) {
     return this.userService.updateBleVisibility(user.id, dto);
+  }
+
+  @Post('profile-image')
+  @UseInterceptors(FileInterceptor('image'))
+  uploadProfileImage(
+    @CurrentUser() user: { id: string },
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('이미지 파일이 없습니다.');
+    return this.userService.uploadProfileImage(user.id, file.filename);
+  }
+
+  @Delete('profile-image')
+  @HttpCode(HttpStatus.OK)
+  deleteProfileImage(@CurrentUser() user: { id: string }) {
+    return this.userService.deleteProfileImage(user.id);
   }
 
   @Delete('me')

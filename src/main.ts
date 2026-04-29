@@ -5,11 +5,16 @@ import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { RedisIoAdapter } from './redis/redis-io.adapter';
+import { join } from 'path';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.listen(3000, '0.0.0.0');
 
+  // 정적 파일 서빙 추가 — /uploads/profiles/xxx.jpg 로 직접 접근 가능
+  app.useStaticAssets(join(process.cwd(), 'uploads'), {
+    prefix: '/uploads',
+  });
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

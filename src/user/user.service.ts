@@ -9,6 +9,8 @@ import { UpdateNicknameDto } from './dto/update-nickname.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { UpdateBleVisibilityDto } from './dto/update-ble-visibility.dto';
 import * as bcrypt from 'bcrypt';
+import { existsSync, unlinkSync } from 'fs';
+import { join } from 'path';
 
 const SALT_ROUNDS = 12;
 
@@ -110,5 +112,58 @@ export class UserService {
 
   async issueBleToken(userId: string) {
     return this.bleTokenService.issueToken(userId);
+  }
+
+  async uploadProfileImage(
+    userId: string,
+    filename: string,
+  ): Promise<{ profileImageUrl: string }> {
+    // 기존 프로필 이미지 파일 삭제
+    const existing = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { profileImageUrl: true },
+    });
+  
+    if (existing?.profileImageUrl) {
+      // URL에서 파일명만 추출하여 삭제
+      const oldFilename = existing.profileImageUrl.split('/').pop();
+      if (oldFilename) {
+        const oldPath = join(process.cwd(), 'uploads', 'profiles', oldFilename);
+        if (existsSync(oldPath)) {
+          unlinkSync(oldPath);
+        }
+      }
+    }
+  
+    const profileImageUrl = `/uploads/profiles/${filename}`;
+  
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { profileImageUrl },
+    });
+  
+    return { profileImageUrl };
+  }
+  
+  async deleteProfileImage(userId: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { profileImageUrl: true },
+    });
+  
+    if (!user?.profileImageUrl) return;
+  
+    const filename = user.profileImageUrl.split('/').pop();
+    if (filename) {
+      const filePath = join(process.cwd(), 'uploads', 'profiles', filename);
+      if (existsSync(filePath)) {
+        unlinkSync(filePath);
+      }
+    }
+  
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { profileImageUrl: null },
+    });
   }
 }
