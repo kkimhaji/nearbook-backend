@@ -14,7 +14,7 @@ import { BleTokenService } from './ble-token.service';
         destination: join(process.cwd(), 'uploads', 'profiles'),
         filename: (_req, file, cb) => {
           // 파일명 충돌 방지: uuid + 원본 확장자
-          cb(null, `${uuidv4()}${extname(file.originalname)}`);
+          cb(null, `${crypto.randomUUID()}${extname(file.originalname)}`);
         },
       }),
       fileFilter: (_req, file, cb) => {
