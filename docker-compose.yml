@@ -1,7 +1,4 @@
 services:
-  app:
-    volumes:
-      - ./uploads:/app/uploads 
   postgres:
     image: postgres:16-alpine
     container_name: nearbook_postgres
@@ -47,6 +44,13 @@ services:
         REDIS_URL: redis://redis:6379
         JWT_SECRET: ${JWT_SECRET}
         JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+        SMTP_HOST: ${SMTP_HOST}
+        SMTP_PORT: ${SMTP_PORT}
+        SMTP_USER: ${SMTP_USER}
+        SMTP_PASS: ${SMTP_PASS}
+        SMTP_FROM: ${SMTP_FROM}
+      volumes:
+        - ./uploads:/app/uploads 
       depends_on:
         postgres:
           condition: service_healthy
