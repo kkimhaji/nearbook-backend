@@ -130,4 +130,25 @@ export class FriendService {
       orderBy: { createdAt: 'desc' },
     });
   }
+
+  async deleteFriend(userId: string, friendshipId: number) {
+    const friendship = await this.prisma.friendship.findUnique({
+      where: { id: friendshipId },
+    });
+  
+    if (!friendship) throw new NotFoundException('친구 관계를 찾을 수 없습니다.');
+  
+    // 요청자 또는 수신자 중 한 명이어야 삭제 가능
+    if (friendship.requesterId !== userId && friendship.receiverId !== userId) {
+      throw new ForbiddenException('삭제 권한이 없습니다.');
+    }
+  
+    if (friendship.status !== 'accepted') {
+      throw new BadRequestException('친구 관계가 아닙니다.');
+    }
+  
+    await this.prisma.friendship.delete({ where: { id: friendshipId } });
+  
+    return { message: '친구가 삭제되었습니다.' };
+  }
 }
