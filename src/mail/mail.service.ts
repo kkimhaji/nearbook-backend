@@ -19,22 +19,29 @@ export class MailService {
     }
 
     async sendTempPassword(to: string, tempPassword: string): Promise<void> {
-        await this.transporter.sendMail({
-            from: this.config.getOrThrow<string>('SMTP_FROM'),
-            to,
-            subject: '[NearBook] 임시 비밀번호 안내',
-            html: `
-        <div style="font-family: sans-serif; max-width: 480px;">
-          <h2>임시 비밀번호 안내</h2>
-          <p>아래 임시 비밀번호로 로그인 후 반드시 비밀번호를 변경해주세요.</p>
-          <div style="background:#f4f4f4; padding:16px; border-radius:8px; font-size:24px; letter-spacing:4px; text-align:center;">
-            <strong>${tempPassword}</strong>
+      const smtpUser = this.config.getOrThrow<string>('SMTP_USER');
+      const smtpFrom = this.config.getOrThrow<string>('SMTP_FROM');
+    
+      const from = smtpFrom.includes('@')
+        ? smtpFrom
+        : `${smtpFrom} <${smtpUser}>`;
+    
+      await this.transporter.sendMail({
+        from,
+        to,
+        subject: '[NearBook] 임시 비밀번호 안내',
+        html: `
+          <div style="font-family: sans-serif; max-width: 480px;">
+            <h2>임시 비밀번호 안내</h2>
+            <p>아래 임시 비밀번호로 로그인 후 반드시 비밀번호를 변경해주세요.</p>
+            <div style="background:#f4f4f4; padding:16px; border-radius:8px; font-size:24px; letter-spacing:4px; text-align:center;">
+              <strong>${tempPassword}</strong>
+            </div>
+            <p style="color:#888; font-size:13px; margin-top:16px;">
+              본인이 요청하지 않은 경우 이 메일을 무시하세요.
+            </p>
           </div>
-          <p style="color:#888; font-size:13px; margin-top:16px;">
-            본인이 요청하지 않은 경우 이 메일을 무시하세요.
-          </p>
-        </div>
-      `,
-        });
+        `,
+      });
     }
 }
