@@ -68,4 +68,12 @@ export class GuestbookController {
   ) {
     return this.guestbookService.getWrittenGuestbook(user.id, groupBy);
   }
+
+  @Patch('request/:id/cancel-writing')
+  cancelWriting(
+    @CurrentUser() user: { id: string },
+    @Param('id', ParseIntPipe) requestId: number,
+  ) {
+    return this.guestbookService.cancelWriting(user.id, requestId);
+  }
 }

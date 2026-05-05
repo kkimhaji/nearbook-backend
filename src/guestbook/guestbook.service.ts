@@ -305,4 +305,34 @@ export class GuestbookService {
 
     return Array.from(map.values());
   }
+
+  async cancelWriting(userId: string, requestId: number) {
+    const request = await this.findRequestOrThrow(requestId);
+
+    if (request.writerId !== userId) {
+      throw new ForbiddenException('권한이 없습니다.');
+    }
+
+    if (request.status !== 'writing') {
+      // 이미 다른 상태면 무시 (중복 호출 방어)
+      return;
+    }
+
+    await this.prisma.guestbookRequest.update({
+      where: { id: requestId },
+      data: { status: 'pending' },
+    });
+
+    // 요청자에게 방명록 요청을 재알림
+    const owner = await this.prisma.user.findUnique({
+      where: { id: request.ownerId },
+      select: { id: true, username: true, nickname: true, profileImageUrl: true },
+    });
+
+    this.gateway.emitGuestbookRequestReceived(request.ownerId, {
+      requestId: request.id,
+      owner,
+      expiresAt: request.expiresAt,
+    });
+  }
 }
