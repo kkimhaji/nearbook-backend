@@ -96,17 +96,21 @@ export class GuestbookService {
 
   async markAsWriting(userId: string, requestId: number) {
     const request = await this.findRequestOrThrow(requestId);
-
+  
     if (request.writerId !== userId) {
       throw new ForbiddenException('권한이 없습니다.');
     }
-
+  
+    this.checkExpired(request.expiresAt);
+  
+    if (request.status === 'writing') {
+      return request;
+    }
+  
     if (request.status !== 'pending') {
       throw new BadRequestException('처리할 수 없는 요청입니다.');
     }
-
-    this.checkExpired(request.expiresAt);
-
+  
     return this.prisma.guestbookRequest.update({
       where: { id: requestId },
       data: { status: 'writing' },
