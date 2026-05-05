@@ -35,7 +35,6 @@ export class GuestbookService {
       throw new BadRequestException('자기 자신에게 방명록을 요청할 수 없습니다.');
     }
 
-    // 친구 여부 확인
     const friendship = await this.prisma.friendship.findFirst({
       where: {
         OR: [
@@ -49,33 +48,43 @@ export class GuestbookService {
       throw new ForbiddenException('친구에게만 방명록을 요청할 수 있습니다.');
     }
 
-    // 이미 진행 중인 요청 확인
+    const owner = await this.prisma.user.findUnique({
+      where: { id: ownerId },
+      select: { id: true, username: true, nickname: true, profileImageUrl: true },
+    });
+
     const existingRequest = await this.prisma.guestbookRequest.findFirst({
       where: {
         ownerId,
         writerId: writer.id,
         status: { in: ['pending', 'writing'] },
+        expiresAt: { gt: new Date() },
       },
+      orderBy: { id: 'desc' },
     });
 
     if (existingRequest) {
-      throw new BadRequestException('이미 진행 중인 방명록 요청이 있습니다.');
+      this.gateway.emitGuestbookRequestReceived(writer.id, {
+        requestId: existingRequest.id,
+        owner,
+        expiresAt: existingRequest.expiresAt,
+      });
+
+      return existingRequest;
     }
 
     const expiresAt = new Date(
       Date.now() + REQUEST_EXPIRES_MINUTES * 60 * 1000,
     );
 
-    const owner = await this.prisma.user.findUnique({
-      where: { id: ownerId },
-      select: { id: true, username: true, nickname: true, profileImageUrl: true },
-    });
-
     const request = await this.prisma.guestbookRequest.create({
-      data: { ownerId, writerId: writer.id, expiresAt },
+      data: {
+        ownerId,
+        writerId: writer.id,
+        expiresAt,
+      },
     });
 
-    // WebSocket 알림
     this.gateway.emitGuestbookRequestReceived(writer.id, {
       requestId: request.id,
       owner,
@@ -314,8 +323,7 @@ export class GuestbookService {
     }
 
     if (request.status !== 'writing') {
-      // 이미 다른 상태면 무시 (중복 호출 방어)
-      return;
+      return { message: '이미 writing 상태가 아닙니다.' };
     }
 
     await this.prisma.guestbookRequest.update({
@@ -323,16 +331,6 @@ export class GuestbookService {
       data: { status: 'pending' },
     });
 
-    // 요청자에게 방명록 요청을 재알림
-    const owner = await this.prisma.user.findUnique({
-      where: { id: request.ownerId },
-      select: { id: true, username: true, nickname: true, profileImageUrl: true },
-    });
-
-    this.gateway.emitGuestbookRequestReceived(request.ownerId, {
-      requestId: request.id,
-      owner,
-      expiresAt: request.expiresAt,
-    });
+    return { message: '방명록 작성 상태를 취소했습니다.' };
   }
 }
