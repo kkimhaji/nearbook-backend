@@ -118,24 +118,24 @@ export class NearBookGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
 
-@SubscribeMessage(GatewayEvents.BLE_DETECTED)
-async handleBleDetected(
-  @ConnectedSocket() client: AuthenticatedSocket,
-  @MessageBody() data: { deviceTokens: string[] },
-): Promise<void> {
-  if (!client.userId) return;
+  @SubscribeMessage(GatewayEvents.BLE_DETECTED)
+  async handleBleDetected(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { deviceTokens: string[] },
+  ): Promise<void> {
+    if (!client.userId) return;
 
-  console.log(`[BLE] ${client.username} 토큰 수신:`, data.deviceTokens);
+    console.log(`[BLE] ${client.username} 토큰 수신:`, data.deviceTokens);
 
-  const detectedUsers = await this.resolveDeviceTokens(
-    data.deviceTokens,
-    client.userId,
-  );
+    const detectedUsers = await this.resolveDeviceTokens(
+      data.deviceTokens,
+      client.userId,
+    );
 
-  console.log(`[BLE] ${client.username} 감지 결과:`, detectedUsers);
+    console.log(`[BLE] ${client.username} 감지 결과:`, detectedUsers);
 
-  client.emit(GatewayEvents.BLE_DETECTED_RESULT, { detectedUsers });
-}
+    client.emit(GatewayEvents.BLE_DETECTED_RESULT, { detectedUsers });
+  }
 
   emitFriendRequestReceived(receiverId: string, payload: object): void {
     const socketId = this.gatewayService.getSocketId(receiverId);
@@ -172,17 +172,17 @@ async handleBleDetected(
     requesterId: string,
   ): Promise<object[]> {
     if (tokens.length === 0) return [];
-  
+
     // 1. Redis에서 token → userId 일괄 변환
     const tokenUserMap = await this.bleTokenService.resolveTokens(tokens);
-  
+
     if (tokenUserMap.size === 0) return [];
-  
+
     const userIds = Array.from(tokenUserMap.values())
       .filter((id) => id !== requesterId);
-  
+
     if (userIds.length === 0) return [];
-  
+
     // 2. 유저 정보 일괄 조회
     const users = await this.prisma.user.findMany({
       where: { id: { in: userIds } },
@@ -194,38 +194,35 @@ async handleBleDetected(
         bleVisibility: true,
       },
     });
-  
+
     // 3. hidden 제외
     const candidates = users.filter((u) => u.bleVisibility !== 'hidden');
-  
+
     if (candidates.length === 0) return [];
-  
-    // 4. friends_only 친구 관계 일괄 조회
-    const friendsOnlyIds = candidates
-      .filter((u) => u.bleVisibility === 'friends_only')
-      .map((u) => u.id);
-  
-    const friendships =
-      friendsOnlyIds.length > 0
-        ? await this.prisma.friendship.findMany({
-            where: {
-              status: 'accepted',
-              OR: [
-                { requesterId, receiverId: { in: friendsOnlyIds } },
-                { requesterId: { in: friendsOnlyIds }, receiverId: requesterId },
-              ],
-            },
-            select: { requesterId: true, receiverId: true },
-          })
-        : [];
-  
+
+    // 4. 전체 candidates 대상으로 친구 관계 조회
+    const allCandidateIds = candidates.map((u) => u.id);
+
+    const friendships = allCandidateIds.length > 0
+      ? await this.prisma.friendship.findMany({
+        where: {
+          status: 'accepted',
+          OR: [
+            { requesterId, receiverId: { in: allCandidateIds } },
+            { requesterId: { in: allCandidateIds }, receiverId: requesterId },
+          ],
+        },
+        select: { requesterId: true, receiverId: true },
+      })
+      : [];
+
     const friendIds = new Set(
       friendships.map((f) =>
         f.requesterId === requesterId ? f.receiverId : f.requesterId,
       ),
     );
-  
-    // 5. visibility 필터링
+
+    // 5. visibility 필터링 (기존과 동일)
     return candidates
       .filter((u) => {
         if (u.bleVisibility === 'public') return true;
