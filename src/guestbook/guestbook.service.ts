@@ -35,18 +35,18 @@ export class GuestbookService {
       throw new BadRequestException('자기 자신에게 방명록을 요청할 수 없습니다.');
     }
 
-    const friendship = await this.prisma.friendship.findFirst({
-      where: {
-        OR: [
-          { requesterId: ownerId, receiverId: writer.id, status: 'accepted' },
-          { requesterId: writer.id, receiverId: ownerId, status: 'accepted' },
-        ],
-      },
-    });
+    // const friendship = await this.prisma.friendship.findFirst({
+    //   where: {
+    //     OR: [
+    //       { requesterId: ownerId, receiverId: writer.id, status: 'accepted' },
+    //       { requesterId: writer.id, receiverId: ownerId, status: 'accepted' },
+    //     ],
+    //   },
+    // });
 
-    if (!friendship) {
-      throw new ForbiddenException('친구에게만 방명록을 요청할 수 있습니다.');
-    }
+    // if (!friendship) {
+    //   throw new ForbiddenException('친구에게만 방명록을 요청할 수 있습니다.');
+    // }
 
     const owner = await this.prisma.user.findUnique({
       where: { id: ownerId },

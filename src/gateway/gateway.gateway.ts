@@ -237,6 +237,7 @@ async handleBleDetected(
         username,
         nickname,
         profileImageUrl,
+        isFriend: friendIds.has(id),
       }));
   }
 }
