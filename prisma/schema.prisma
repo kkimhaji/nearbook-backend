@@ -25,6 +25,11 @@ enum GuestbookRequestStatus {
   rejected
 }
 
+enum GuestbookVisibility {
+  private
+  friends_only
+}
+
 model User {
   id               String        @id @default(uuid())
   username        String        @unique
@@ -43,6 +48,7 @@ model User {
   writtenEntries      GuestbookEntry[]    @relation("EntryWriter")
 
   @@map("users")
+  guestbookVisibility GuestbookVisibility @default(private) @map("guestbook_visibility")
 }
 
 model Friendship {
@@ -84,4 +90,5 @@ model GuestbookEntry {
   writer User @relation("EntryWriter", fields: [writerId], references: [id])
 
   @@map("guestbook_entries")
+  visibility GuestbookVisibility @default(private)
 }

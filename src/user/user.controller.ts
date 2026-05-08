@@ -20,11 +20,12 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UpdateNicknameDto } from './dto/update-nickname.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { UpdateBleVisibilityDto } from './dto/update-ble-visibility.dto';
+import { UpdateGuestbookVisibilityDto } from './dto/update-guestbook-visibility.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('users')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(private readonly userService: UserService) { }
 
   @Get('me')
   getMyProfile(@CurrentUser() user: { id: string }) {
@@ -89,5 +90,13 @@ export class UserController {
   @HttpCode(HttpStatus.OK)
   deleteAccount(@CurrentUser() user: { id: string }) {
     return this.userService.deleteAccount(user.id);
+  }
+
+  @Patch('guestbook-visibility')
+  updateGuestbookVisibility(
+    @CurrentUser() user: { id: string },
+    @Body() dto: UpdateGuestbookVisibilityDto,
+  ) {
+    return this.userService.updateGuestbookVisibility(user.id, dto);
   }
 }
