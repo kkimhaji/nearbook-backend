@@ -291,6 +291,7 @@ export class GuestbookService {
         id: entry.id,
         content: entry.content,
         createdAt: entry.createdAt,
+        visibility: entry.visibility,
       });
     }
 
@@ -313,6 +314,7 @@ export class GuestbookService {
         createdAt: entry.createdAt,
         writer: entry.writer,
         owner: entry.owner,
+        visibility: entry.visibility,
       });
     }
 
