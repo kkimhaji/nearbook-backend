@@ -14,6 +14,8 @@ import { RequestGuestbookDto } from './dto/request-guestbook.dto';
 import { SubmitGuestbookDto } from './dto/submit-guestbook.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { UpdateEntryVisibilityDto } from './dto/update-entry-visibility.dto';
+
 
 @UseGuards(JwtAuthGuard)
 @Controller('guestbook')
@@ -75,5 +77,22 @@ export class GuestbookController {
     @Param('id', ParseIntPipe) requestId: number,
   ) {
     return this.guestbookService.cancelWriting(user.id, requestId);
+  }
+
+  @Get('friend/:username')
+  getFriendGuestbook(
+    @CurrentUser() user: { id: string },
+    @Param('username') username: string,
+  ) {
+    return this.guestbookService.getFriendGuestbook(user.id, username);
+  }
+
+  @Patch('entries/:id/visibility')
+  updateEntryVisibility(
+    @CurrentUser() user: { id: string },
+    @Param('id', ParseIntPipe) entryId: number,
+    @Body() dto: UpdateEntryVisibilityDto,
+  ) {
+    return this.guestbookService.updateEntryVisibility(user.id, entryId, dto);
   }
 }
