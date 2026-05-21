@@ -97,21 +97,21 @@ export class GuestbookService {
 
   async markAsWriting(userId: string, requestId: number) {
     const request = await this.findRequestOrThrow(requestId);
-  
+
     if (request.writerId !== userId) {
       throw new ForbiddenException('권한이 없습니다.');
     }
-  
+
     this.checkExpired(request.expiresAt);
-  
+
     if (request.status === 'writing') {
       return request;
     }
-  
+
     if (request.status !== 'pending') {
       throw new BadRequestException('처리할 수 없는 요청입니다.');
     }
-  
+
     return this.prisma.guestbookRequest.update({
       where: { id: requestId },
       data: { status: 'writing' },
@@ -147,19 +147,19 @@ export class GuestbookService {
 
   async submitGuestbook(userId: string, requestId: number, dto: SubmitGuestbookDto) {
     const request = await this.findRequestOrThrow(requestId);
-  
+
     if (request.writerId !== userId) throw new ForbiddenException('권한이 없습니다.');
     if (request.status !== 'pending' && request.status !== 'writing') {
       throw new BadRequestException('처리할 수 없는 요청입니다.');
     }
     this.checkExpired(request.expiresAt);
-  
+
     // owner의 기본 공개 설정 조회
     const owner = await this.prisma.user.findUnique({
       where: { id: request.ownerId },
       select: { guestbookVisibility: true, id: true, username: true, nickname: true, profileImageUrl: true },
     });
-  
+
     const [entry] = await this.prisma.$transaction([
       this.prisma.guestbookEntry.create({
         data: {
@@ -174,22 +174,22 @@ export class GuestbookService {
         data: { status: 'completed' },
       }),
     ]);
-  
+
     const writer = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, username: true, nickname: true, profileImageUrl: true },
     });
-  
+
     this.gateway.emitGuestbookCompleted(request.ownerId, {
       entryId: entry.id,
       writer,
       content: dto.content,
       createdAt: entry.createdAt,
     });
-  
+
     return entry;
   }
-  
+
   async updateEntryVisibility(
     userId: string,
     entryId: number,
@@ -198,10 +198,10 @@ export class GuestbookService {
     const entry = await this.prisma.guestbookEntry.findUnique({
       where: { id: entryId },
     });
-  
+
     if (!entry) throw new NotFoundException('방명록 항목을 찾을 수 없습니다.');
     if (entry.ownerId !== userId) throw new ForbiddenException('권한이 없습니다.');
-  
+
     return this.prisma.guestbookEntry.update({
       where: { id: entryId },
       data: { visibility: dto.visibility },
@@ -214,9 +214,9 @@ export class GuestbookService {
       where: { username: ownerUsername },
       select: { id: true, username: true, nickname: true, profileImageUrl: true },
     });
-  
+
     if (!owner) throw new NotFoundException('존재하지 않는 사용자입니다.');
-  
+
     // 친구 여부 확인
     const friendship = await this.prisma.friendship.findFirst({
       where: {
@@ -227,9 +227,9 @@ export class GuestbookService {
         ],
       },
     });
-  
+
     if (!friendship) throw new ForbiddenException('친구에게만 공개된 방명록입니다.');
-  
+
     const entries = await this.prisma.guestbookEntry.findMany({
       where: {
         ownerId: owner.id,
@@ -247,10 +247,10 @@ export class GuestbookService {
       },
       orderBy: { createdAt: 'desc' },
     });
-  
+
     return { owner, entries };
   }
-  
+
   async getMyGuestbook(
     ownerId: string,
     groupBy: 'writer' | 'date',
@@ -397,5 +397,18 @@ export class GuestbookService {
     });
 
     return { message: '방명록 작성 상태를 취소했습니다.' };
+  }
+
+  async deleteEntry(userId: string, entryId: number): Promise<{ message: string }> {
+    const entry = await this.prisma.guestbookEntry.findUnique({
+      where: { id: entryId },
+    });
+
+    if (!entry) throw new NotFoundException('방명록 항목을 찾을 수 없습니다.');
+    if (entry.ownerId !== userId) throw new ForbiddenException('권한이 없습니다.');
+
+    await this.prisma.guestbookEntry.delete({ where: { id: entryId } });
+
+    return { message: '방명록이 삭제되었습니다.' };
   }
 }

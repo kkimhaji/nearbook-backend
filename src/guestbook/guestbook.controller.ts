@@ -8,6 +8,9 @@ import {
   Query,
   UseGuards,
   ParseIntPipe,
+  Delete,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { GuestbookService } from './guestbook.service';
 import { RequestGuestbookDto } from './dto/request-guestbook.dto';
@@ -85,6 +88,15 @@ export class GuestbookController {
     @Param('username') username: string,
   ) {
     return this.guestbookService.getFriendGuestbook(user.id, username);
+  }
+
+  @Delete('entries/:id')
+  @HttpCode(HttpStatus.OK)
+  deleteEntry(
+    @CurrentUser() user: { id: string },
+    @Param('id', ParseIntPipe) entryId: number,
+  ) {
+    return this.guestbookService.deleteEntry(user.id, entryId);
   }
 
   @Patch('entries/:id/visibility')
