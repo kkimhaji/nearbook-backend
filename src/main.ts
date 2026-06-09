@@ -6,9 +6,11 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { RedisIoAdapter } from './redis/redis-io.adapter';
 import { join } from 'path';
+import helmet from 'helmet';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.use(helmet());
   app.listen(3000, '0.0.0.0');
 
   // 정적 파일 서빙 추가 — /uploads/profiles/xxx.jpg 로 직접 접근 가능
