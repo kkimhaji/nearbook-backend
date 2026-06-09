@@ -22,8 +22,10 @@ interface AuthenticatedSocket extends Socket {
 }
 
 @WebSocketGateway({
-  cors: { origin: '*' },
-  namespace: '/',
+  cors: {
+    origin: process.env.ALLOWED_ORIGINS?.split(',') ?? ['http://localhost:3000'],
+    credentials: true,
+  },
 })
 export class NearBookGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
