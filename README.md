@@ -8,10 +8,19 @@
 ![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)
 
 
-> 가까이 있는 친구의 수첩에 방명록을 남기는 앱
-> 
+> BLE 기반 근접 감지로 실제 만남을 기록하는 모바일 방명록 서비스
 
-BLE(Bluetooth Low Energy)로 물리적으로 근접한 친구를 감지하고, 상대방의 방명록에 글을 남길 수 있는 모바일 애플리케이션입니다.
+NearBook은 BLE(Bluetooth Low Energy)를 이용해 주변 친구를 감지하고,
+친구에게 방명록 작성을 요청할 수 있는 모바일 애플리케이션입니다.
+
+기존 SNS처럼 언제든 상호작용할 수 있는 구조가 아니라,
+실제로 같은 공간에 있는 경우에만 방명록을 남길 수 있도록 설계했습니다.
+
+방명록 요청, 작성 상태 공유, 작성 완료 알림은 WebSocket으로 실시간 처리하며,
+사용자 식별은 Redis TTL 기반 Device Token을 활용해 개인정보 노출을 최소화했습니다.
+<br/>
+
+**Frontend Repository**: https://github.com/kkimhaji/nearbook-frontend
 
 <br/>
 
