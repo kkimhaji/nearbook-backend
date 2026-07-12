@@ -1,8 +1,7 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { NearBookGateway } from './gateway.gateway';
-import { GatewayService } from './gateway.service';
 import { UserModule } from '../user/user.module';
 
 @Module({
@@ -16,7 +15,7 @@ import { UserModule } from '../user/user.module';
     }),
     UserModule,
   ],
-  providers: [NearBookGateway, GatewayService],
-  exports: [NearBookGateway, GatewayService],
+  providers: [NearBookGateway],
+  exports: [NearBookGateway],
 })
 export class GatewayModule {}

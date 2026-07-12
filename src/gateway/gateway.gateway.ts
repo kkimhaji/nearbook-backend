@@ -10,7 +10,6 @@ import {
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from 'prisma/prisma.service';
-import { GatewayService } from './gateway.service';
 import { GatewayEvents } from './gateway.events';
 import { ConfigService } from '@nestjs/config';
 import { BleTokenService } from 'src/user/ble-token.service';
@@ -32,66 +31,66 @@ export class NearBookGateway implements OnGatewayConnection, OnGatewayDisconnect
   server: Server;
 
   constructor(
-    private readonly gatewayService: GatewayService,
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly bleTokenService: BleTokenService,
   ) { }
 
+async handleConnection(client: AuthenticatedSocket): Promise<void> {
+  const token = client.handshake.auth?.token as string | undefined;
 
-  async handleConnection(client: AuthenticatedSocket): Promise<void> {
-    const token = client.handshake.auth?.token as string | undefined;
+  if (!token) {
+    console.log(`[Gateway] 연결 거부 - 토큰 없음 (socketId: ${client.id})`);
+    client.disconnect();
+    return;
+  }
 
-    if (!token) {
+  try {
+    const payload = this.jwtService.verify(token, {
+      secret: this.configService.getOrThrow<string>('JWT_SECRET'),
+    });
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { id: true, username: true, nickname: true },
+    });
+
+    if (!user) {
+      console.log(`[Gateway] 연결 거부 - 유저 없음 (userId: ${payload.sub})`);
       client.disconnect();
       return;
     }
 
-    try {
-      const payload = this.jwtService.verify(token, {
-        secret: this.configService.getOrThrow<string>('JWT_SECRET'),
-      });
+    client.userId = user.id;
+    client.username = user.username;
+    client.nickname = user.nickname;
 
-      const user = await this.prisma.user.findUnique({
-        where: { id: payload.sub },
-        select: { id: true, username: true, nickname: true },
-      });
+    client.join(user.id);
 
-      if (!user) {
-        client.disconnect();
-        return;
-      }
+    console.log(`[Gateway] 인증 성공 - ${user.username} (socketId: ${client.id})`);
 
-      client.userId = user.id;
-      client.username = user.username;
-      client.nickname = user.nickname;
-
-      this.gatewayService.register(user.id, client.id);
-
-      client.emit(GatewayEvents.AUTHENTICATED, {
-        userId: user.id,
-        username: user.username,
-        nickname: user.nickname,
-      });
-    } catch {
-      client.disconnect();
-    }
+    client.emit(GatewayEvents.AUTHENTICATED, {
+      userId: user.id,
+      username: user.username,
+      nickname: user.nickname,
+    });
+  } catch (err) {
+    console.log(`[Gateway] 인증 실패 (socketId: ${client.id}):`, err.message);
+    client.disconnect();
   }
+}
 
-  handleDisconnect(client: AuthenticatedSocket): void {
-    this.gatewayService.remove(client.id);
-  }
+handleDisconnect(client: AuthenticatedSocket): void {
+  console.log(`[Gateway] 연결 해제 - ${client.username ?? '미인증'} (socketId: ${client.id})`);
+}
 
   @SubscribeMessage(GatewayEvents.TYPING_START)
   handleTypingStart(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { targetUserId: string; requestId: number },
   ): void {
-    const targetSocketId = this.gatewayService.getSocketId(data.targetUserId);
-    if (!targetSocketId) return;
-
-    this.server.to(targetSocketId).emit(GatewayEvents.GUESTBOOK_TYPING_START, {
+    this.server.to(data.targetUserId).emit(GatewayEvents.GUESTBOOK_TYPING_START, {
       requestId: data.requestId,
       writer: {
         userId: client.userId,
@@ -106,10 +105,7 @@ export class NearBookGateway implements OnGatewayConnection, OnGatewayDisconnect
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { targetUserId: string; requestId: number },
   ): void {
-    const targetSocketId = this.gatewayService.getSocketId(data.targetUserId);
-    if (!targetSocketId) return;
-
-    this.server.to(targetSocketId).emit(GatewayEvents.GUESTBOOK_TYPING_STOP, {
+    this.server.to(data.targetUserId).emit(GatewayEvents.GUESTBOOK_TYPING_STOP, {
       requestId: data.requestId,
       writer: {
         userId: client.userId,
@@ -118,7 +114,6 @@ export class NearBookGateway implements OnGatewayConnection, OnGatewayDisconnect
       },
     });
   }
-
 
   @SubscribeMessage(GatewayEvents.BLE_DETECTED)
   async handleBleDetected(
@@ -140,33 +135,23 @@ export class NearBookGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   emitFriendRequestReceived(receiverId: string, payload: object): void {
-    const socketId = this.gatewayService.getSocketId(receiverId);
-    if (!socketId) return;
-    this.server.to(socketId).emit(GatewayEvents.FRIEND_REQUEST_RECEIVED, payload);
+    this.server.to(receiverId).emit(GatewayEvents.FRIEND_REQUEST_RECEIVED, payload);
   }
 
   emitFriendRequestAccepted(requesterId: string, payload: object): void {
-    const socketId = this.gatewayService.getSocketId(requesterId);
-    if (!socketId) return;
-    this.server.to(socketId).emit(GatewayEvents.FRIEND_REQUEST_ACCEPTED, payload);
+    this.server.to(requesterId).emit(GatewayEvents.FRIEND_REQUEST_ACCEPTED, payload);
   }
 
   emitGuestbookRequestReceived(writerId: string, payload: object): void {
-    const socketId = this.gatewayService.getSocketId(writerId);
-    if (!socketId) return;
-    this.server.to(socketId).emit(GatewayEvents.GUESTBOOK_REQUEST_RECEIVED, payload);
+    this.server.to(writerId).emit(GatewayEvents.GUESTBOOK_REQUEST_RECEIVED, payload);
   }
 
   emitGuestbookRequestRejected(ownerId: string, payload: object): void {
-    const socketId = this.gatewayService.getSocketId(ownerId);
-    if (!socketId) return;
-    this.server.to(socketId).emit(GatewayEvents.GUESTBOOK_REQUEST_REJECTED, payload);
+    this.server.to(ownerId).emit(GatewayEvents.GUESTBOOK_REQUEST_REJECTED, payload);
   }
 
   emitGuestbookCompleted(ownerId: string, payload: object): void {
-    const socketId = this.gatewayService.getSocketId(ownerId);
-    if (!socketId) return;
-    this.server.to(socketId).emit(GatewayEvents.GUESTBOOK_COMPLETED, payload);
+    this.server.to(ownerId).emit(GatewayEvents.GUESTBOOK_COMPLETED, payload);
   }
 
   private async resolveDeviceTokens(
@@ -175,17 +160,13 @@ export class NearBookGateway implements OnGatewayConnection, OnGatewayDisconnect
   ): Promise<object[]> {
     if (tokens.length === 0) return [];
 
-    // 1. Redis에서 token → userId 일괄 변환
     const tokenUserMap = await this.bleTokenService.resolveTokens(tokens);
-
     if (tokenUserMap.size === 0) return [];
 
     const userIds = Array.from(tokenUserMap.values())
       .filter((id) => id !== requesterId);
-
     if (userIds.length === 0) return [];
 
-    // 2. 유저 정보 일괄 조회
     const users = await this.prisma.user.findMany({
       where: { id: { in: userIds } },
       select: {
@@ -197,12 +178,9 @@ export class NearBookGateway implements OnGatewayConnection, OnGatewayDisconnect
       },
     });
 
-    // 3. hidden 제외
     const candidates = users.filter((u) => u.bleVisibility !== 'hidden');
-
     if (candidates.length === 0) return [];
 
-    // 4. 전체 candidates 대상으로 친구 관계 조회
     const allCandidateIds = candidates.map((u) => u.id);
 
     const friendships = allCandidateIds.length > 0
@@ -224,7 +202,6 @@ export class NearBookGateway implements OnGatewayConnection, OnGatewayDisconnect
       ),
     );
 
-    // 5. visibility 필터링 (기존과 동일)
     return candidates
       .filter((u) => {
         if (u.bleVisibility === 'public') return true;
