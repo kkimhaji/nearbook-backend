@@ -38,6 +38,7 @@ model User {
   password         String
   profileImageUrl  String?       @map("profile_image_url")
   bleVisibility    BleVisibility @default(friends_only) @map("ble_visibility")
+  hashedRefreshToken String?     @map("hashed_refresh_token")
   createdAt        DateTime      @default(now()) @map("created_at")
 
   sentFriendships     Friendship[]        @relation("Requester")
