@@ -11,7 +11,7 @@ import * as crypto from 'crypto';
 
 const SALT_ROUNDS = 12;
 
-interface TokenPair {
+export interface TokenPair {
   accessToken: string;
   refreshToken: string;
 }
@@ -74,10 +74,6 @@ export class AuthService {
     return this.issueAndStoreTokens(user.id, user.username);
   }
 
-  /**
-   * Refresh Token으로 Access Token / Refresh Token을 재발급한다 (Rotation).
-   * 재사용된(탈취된) Refresh Token으로 판단되면 해당 계정의 모든 세션을 무효화한다.
-   */
   async refresh(dto: RefreshTokenDto): Promise<TokenPair> {
     let payload: { sub: string; username: string };
 
@@ -103,8 +99,6 @@ export class AuthService {
     );
 
     if (!isRefreshTokenValid) {
-      // DB에 저장된 해시와 다른 토큰이 들어옴 → 탈취/재사용 가능성
-      // 해당 계정의 세션을 전부 끊어 추가 피해를 차단
       await this.invalidateRefreshToken(user.id);
       throw new UnauthorizedException('재로그인이 필요합니다.');
     }
@@ -150,13 +144,11 @@ export class AuthService {
   async forgotPassword(email: string): Promise<void> {
     const user = await this.prisma.user.findUnique({ where: { email } });
 
-    // 이메일 존재 여부를 응답으로 노출하지 않음 (보안)
     if (!user) return;
 
     const tempPassword = crypto.randomBytes(5).toString('hex');
     const hashed = await bcrypt.hash(tempPassword, SALT_ROUNDS);
 
-    // 비밀번호 재설정 시 기존 Refresh Token도 함께 무효화 (탈취된 계정 보호)
     await this.prisma.user.update({
       where: { id: user.id },
       data: { password: hashed, hashedRefreshToken: null },

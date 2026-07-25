@@ -1,5 +1,5 @@
 import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
-import { AuthService } from './auth.service';
+import { AuthService, TokenPair } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -17,7 +17,7 @@ export class AuthController {
   @ApiResponse({ status: 201, description: '회원가입 성공' })
   @ApiResponse({ status: 409, description: '중복된 아이디 또는 이메일' })
   @Post('register')
-  register(@Body() dto: RegisterDto) {
+  register(@Body() dto: RegisterDto): Promise<TokenPair> {
     return this.authService.register(dto);
   }
 
@@ -26,7 +26,7 @@ export class AuthController {
   @ApiResponse({ status: 401, description: '아이디 또는 비밀번호 불일치' })
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  login(@Body() dto: LoginDto) {
+  login(@Body() dto: LoginDto): Promise<TokenPair> {
     return this.authService.login(dto);
   }
 
@@ -35,7 +35,7 @@ export class AuthController {
   @ApiResponse({ status: 401, description: '유효하지 않거나 재사용된 리프레시 토큰' })
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  refresh(@Body() dto: RefreshTokenDto) {
+  refresh(@Body() dto: RefreshTokenDto): Promise<TokenPair> {
     return this.authService.refresh(dto);
   }
 
